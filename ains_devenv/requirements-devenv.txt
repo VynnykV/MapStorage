@@ -1,0 +1,2 @@
+-r ../map_storage/requirements.txt
+-e ../map_storage/

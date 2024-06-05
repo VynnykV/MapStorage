@@ -1,0 +1,1 @@
+from local_sdk.config import local_map_storage_config

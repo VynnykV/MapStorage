@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  python_host:
+    build:
+      context: ..
+      dockerfile: ./ains_devenv/Dockerfile
+    depends_on:
+      hubdb:
+        condition: service_healthy
+      localdb:
+        condition: service_healthy
+    command: sh -c "
+        cd /ains/map_storage/hub_api/infra/db
+        && alembic upgrade head 
+        && cd /ains/map_storage/local_sdk/infra/db
+        && alembic upgrade head
+        && cd /ains/map_storage
+        && uvicorn hub_api.main:app --host 0.0.0.0 --port 80 --reload
+      "
+    volumes:
+      - ../:/ains
+    ports:
+      - "8000:80"
+
+  map_storage_ui:
+    build:
+      context: ../map_storage_ui
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "3000:3000"
+
+
+  hubdb:
+    image: postgres:16.0-alpine
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres_data:/var/lib/hubdb/data
+    ports:
+      - ${HUB_DB_PORT}:5432
+
+  localdb:
+    image: postgres:16.0-alpine
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres_data:/var/lib/localdb/data
+    ports:
+      - ${LOCAL_DB_PORT}:5432
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      - hubdb
+      - localdb
+    ports:
+      - "5050:80"
+
+volumes:
+  postgres_data:
